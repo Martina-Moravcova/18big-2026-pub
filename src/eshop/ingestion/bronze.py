@@ -45,6 +45,12 @@ def _add_ingestion_metadata(df: pl.DataFrame, source: str, batch_id: str) -> pl.
 
     # Technical lineage: when did it land, from which source, in which ingest batch.
     # TODO(2): add _ingested_at (now), _source (source), _batch_id (batch_id)
+    return df.with_columns(
+        pl.lit(dt.datetime.now(dt.timezone.utc)).alias("_ingested_at"),
+        pl.lit(source).alias("_source"),
+        pl.lit(batch_id).alias("_batch_id"),
+    )
+
     return df
 
 
@@ -68,6 +74,7 @@ def ingest_sqlite(table: str, batch_id: str) -> int:
     con = duckdb.connect()
     # DuckDB reads a SQLite table directly – no running DB server needed.
     # TODO(2): read the whole table from SQLite via sqlite_scan into a Polars frame
+    df = con.sql(f"SELECT * FROM sqlite_scan('{settings.source_db}', '{table}')").pl()
     df = _add_ingestion_metadata(df, f"{settings.source_db.name}:{table}", batch_id)
     _write_bronze(table, df)
     return df.height
@@ -88,9 +95,21 @@ def ingest_incremental(table: str = "orders", key: str = "order_id", batch_id: s
     con = duckdb.connect()
     # Watermark = max(key) already landed; nothing landed yet → read the whole table.
     # TODO(2): compute the watermark from `existing` and read only rows with key > watermark
+    if existing is not None and not existing.is_empty():
+        watermark = existing[key].max()
+        incoming = con.execute(
+            f"SELECT * FROM sqlite_scan('{settings.source_db}', '{table}') WHERE {key} > ?",
+            [watermark],
+        ).pl()
+    else:
+        incoming = con.sql(
+            f"SELECT * FROM sqlite_scan('{settings.source_db}', '{table}')"
+        ).pl()
     incoming = _add_ingestion_metadata(incoming, f"{settings.source_db.name}:{table}", batch_id)
     # Append: keep what Bronze already has and add the new rows below it (no comparing, no dedup).
-    # TODO(2): write `incoming` to Bronze – alone on the first run, else appended to `existing`
+    # TODO(2): write `incoming` to Bronze – alone on the first run, else appended to `existing
+    df = pl.concat([existing, incoming]) if existing is not None else incoming
+    _write_bronze(table, df)
     return incoming.height
 
 
