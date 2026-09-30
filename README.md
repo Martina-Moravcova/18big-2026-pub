@@ -32,7 +32,8 @@ uv run eshop doctor     # verifies everything works
 - Some sessions also include a runnable **marimo notebook** (`sessions/NN-topic/exercise/*.py`
   opened with `uv run marimo edit <file>`, or `just notebook <file>`) – a live, editable walkthrough,
   not a fill-in exercise. Edit any query and re-run its cell to experiment.
-- Run your solution following the instructions in that session's README.
+- Run your solution following the instructions in that session's README. `just` lists the
+  commands available so far (new ones are added as sessions arrive).
 
 ## Structure
 

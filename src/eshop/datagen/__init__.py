@@ -1,3 +1,3 @@
-from eshop.datagen.generate import generate_all
+from eshop.datagen.generate import append_orders, generate_all
 
-__all__ = ["generate_all"]
+__all__ = ["append_orders", "generate_all"]

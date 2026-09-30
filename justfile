@@ -22,3 +22,15 @@ notebook FILE:
 # run a plain .sql exercise/solution through DuckDB, e.g. `just sql sessions/01-foundations/exercise/explore.sql`
 sql FILE:
     uv run eshop sql {{FILE}}
+
+# [S02] land all sources into Bronze (driven by src/eshop/ingestion/sources.yml)
+ingest:
+    uv run eshop ingest
+
+# [S02] peek at a Bronze table: row count, ingest batches, last rows, e.g. `just bronze orders`
+bronze ENTITY="orders":
+    uv run eshop bronze {{ENTITY}}
+
+# [S02] simulate new business: append N orders to the SQLite source, then `just ingest`
+new-orders N="10":
+    uv run eshop new-orders {{N}}

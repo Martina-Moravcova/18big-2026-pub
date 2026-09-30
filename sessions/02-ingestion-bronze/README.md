@@ -34,33 +34,31 @@ You fill in the `# TODO`s in `src/eshop/ingestion/bronze.py`:
    `order_items` to `load: incremental` with `watermark: order_id` – **no code change** – and
    re-run `eshop ingest`. Why is `order_id` a safe watermark for order items?
 
-Then run and inspect the result:
+Then run and inspect the result (`just <cmd>` or the `uv run eshop ...` equivalent):
 
 ```bash
-uv run eshop datagen     # if you don't have source data yet
-uv run eshop ingest      # lands CSV + SQLite into data/lake/bronze/
+just datagen             # uv run eshop datagen – only if you don't have data/raw/ yet
+just ingest              # uv run eshop ingest  – lands every source into data/lake/bronze/
+just bronze orders       # row count, ingest batches and the last rows (note the _ columns)
 ```
 
-Verify a Bronze table carries the metadata:
+Until the `TODO(2)`s in `ingest_incremental` are filled in, `just ingest` fails – `orders` is an
+incremental source in `sources.yml`.
+
+**Try the incremental load:**
 
 ```bash
-uv run python -c "import polars as pl; from eshop.config import settings; \
-print(pl.read_parquet(settings.bronze_dir / 'orders' / 'data.parquet').head())"
+just ingest              # 2nd run: orders → 0 rows (nothing above the watermark)
+just new-orders 5        # the "operational system" gets 5 new orders
+just ingest              # orders → exactly 5 rows
+just bronze orders       # two batches: the initial load + the 5 new orders
 ```
+
+> Re-running `just datagen` rebuilds the source from scratch (ids start at 1 again), while Bronze
+> keeps its watermark. To start over, delete `data/lake/bronze/` too.
 
 ## Deliverable / checkpoint
 
 - `data/lake/bronze/<entity>/data.parquet` for every source, each with `_ingested_at`,
   `_source`, `_batch_id`.
 - **checkpoint-02** = this state.
-
-## Common mistakes / notes for the instructor
-
-- Emphasize that Bronze does **not** clean anything (dirty data is expected – handled in session 5).
-- Show that `sqlite_scan` needs no running DB server – DuckDB reads the file directly.
-- Discuss idempotence: full sources overwrite `data.parquet`, the incremental one finds nothing
-  above the watermark – so re-running is safe either way. A real system usually appends new
-  batches as separate files (leads into partitioning in session 3).
-- Task 5 answer: items are only inserted together with their order, so `order_id` only grows.
-  The watermark here is derived from Bronze (`max(order_id)`); larger frameworks keep it in a
-  **control table** next to the catalogue.

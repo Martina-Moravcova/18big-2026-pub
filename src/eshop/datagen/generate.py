@@ -117,3 +117,30 @@ def generate_all() -> dict[str, int]:
     counts["payments"] = len(payments)
 
     return counts
+
+
+def append_orders(n: int = 10, seed: int | None = None) -> dict[str, int]:
+    """Simulate new business in the operational system: append `n` orders (+ their items) to SQLite.
+
+    New orders get ids above the current max, so an incremental (watermark) ingest picks up
+    exactly these rows. Run `generate_all` first. Returns the new id range and row counts.
+    """
+    rng = random.Random(seed)
+    con = sqlite3.connect(settings.source_db)
+    cur = con.cursor()
+    first = (cur.execute("SELECT COALESCE(MAX(order_id), 0) FROM orders").fetchone()[0]) + 1
+    statuses = ["NEW", "PAID", "SHIPPED", "CANCELLED"]
+    n_items = 0
+    for oid in range(first, first + n):
+        ts = datetime.now() - timedelta(seconds=rng.randint(0, 3600))
+        cur.execute("INSERT INTO orders VALUES(?,?,?,?)",
+                    (oid, rng.randint(1, settings.n_customers), ts.isoformat(sep=" "),
+                     rng.choices(statuses, weights=[1, 5, 3, 1])[0]))
+        for _ in range(rng.randint(1, 5)):
+            cur.execute("INSERT INTO order_items VALUES(?,?,?,?)",
+                        (oid, rng.randint(1, settings.n_products), rng.randint(1, 4),
+                         round(rng.uniform(50, 5000), 2)))
+            n_items += 1
+    con.commit()
+    con.close()
+    return {"first_id": first, "last_id": first + n - 1, "orders": n, "order_items": n_items}

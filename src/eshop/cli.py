@@ -61,6 +61,33 @@ def ingest() -> None:
 
 
 @app.command()
+def new_orders(n: int = typer.Argument(10, help="how many new orders to add")) -> None:
+    """Simulate new business: append N orders to the SQLite source (session 2, incremental)."""
+    from eshop.datagen import append_orders
+
+    r = append_orders(n)
+    console.print(f"[bold]Added {r['orders']} orders[/] (ids {r['first_id']}–{r['last_id']}, "
+                  f"{r['order_items']} items) to {settings.source_db.name}")
+    console.print("Now run [bold]uv run eshop ingest[/] – the incremental source should land "
+                  f"exactly {r['orders']} new orders.")
+
+
+@app.command()
+def bronze(entity: str = typer.Argument("orders", help="Bronze table to inspect")) -> None:
+    """Peek at a Bronze table: row count, ingest batches and the first rows (session 2)."""
+    import polars as pl
+
+    path = settings.bronze_dir / entity / "data.parquet"
+    if not path.exists():
+        raise typer.Exit(console.print(f"[red]No Bronze table[/] {path} – run `eshop ingest` first."))
+    df = pl.read_parquet(path)
+    console.print(f"[bold]{entity}[/]: {df.height:,} rows in {path}")
+    if "_batch_id" in df.columns:
+        console.print(df.group_by("_batch_id", maintain_order=True).len().rename({"len": "rows"}))
+    console.print(df.tail(5))
+
+
+@app.command()
 def silver() -> None:
     """Build the Silver layer: clean, enforce contracts, quarantine bad data (session 5)."""
     from eshop.silver.build_silver import build_silver
