@@ -36,7 +36,12 @@ def _add_ingestion_metadata(df: pl.DataFrame, source: str, batch_id: str) -> pl.
 
     # A content hash as an audit column: Bronze doesn't compare rows, but Silver can use it to dedup.
     # Concatenate all business columns into one string and hash it (deterministic, seed 0).
-    # TODO(2): add a _row_hash over all business_cols (concat_str -> hash(0) -> string)
+    df = df.with_columns(
+        pl.concat_str([pl.col(c).cast(pl.Utf8) for c in business_cols], separator="|")
+        .hash(0)
+        .cast(pl.Utf8)  # string, so it survives Delta (which has no unsigned int type)
+        .alias("_row_hash")
+    )
 
     # Technical lineage: when did it land, from which source, in which ingest batch.
     # TODO(2): add _ingested_at (now), _source (source), _batch_id (batch_id)
@@ -84,7 +89,8 @@ def ingest_incremental(table: str = "orders", key: str = "order_id", batch_id: s
     # Watermark = max(key) already landed; nothing landed yet → read the whole table.
     # TODO(2): compute the watermark from `existing` and read only rows with key > watermark
     incoming = _add_ingestion_metadata(incoming, f"{settings.source_db.name}:{table}", batch_id)
-    _write_bronze(table, incoming if existing is None else pl.concat([existing, incoming]))
+    # Append: keep what Bronze already has and add the new rows below it (no comparing, no dedup).
+    # TODO(2): write `incoming` to Bronze – alone on the first run, else appended to `existing`
     return incoming.height
 
 
