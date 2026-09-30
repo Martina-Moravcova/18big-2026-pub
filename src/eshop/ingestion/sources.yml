@@ -1,0 +1,38 @@
+# Source catalogue – the metadata that drives Bronze ingestion (session 2).
+#
+# Metadata-driven ingestion: one generic loader + this list. Adding a source or switching it
+# from full to incremental is a config change, not a code change.
+#
+#   name       – Bronze table name (data/lake/bronze/<name>/)
+#   type       – csv (a file in data/raw/) | sqlite (a table in data/raw/shop.sqlite)
+#   file       – csv only: file name in data/raw/
+#   table      – sqlite only: source table name
+#   load       – full (re-read everything, overwrite) | incremental (only rows above the watermark)
+#   watermark  – incremental only: a column that only grows (append-only table)
+
+sources:
+  - name: customers
+    type: csv
+    file: customers.csv
+    load: full
+
+  - name: products
+    type: csv
+    file: products.csv
+    load: full
+
+  - name: payments
+    type: csv
+    file: payments.csv
+    load: full
+
+  - name: orders
+    type: sqlite
+    table: orders
+    load: incremental
+    watermark: order_id
+
+  - name: order_items
+    type: sqlite
+    table: order_items
+    load: full

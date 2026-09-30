@@ -23,7 +23,7 @@ dependencies = [
     "rich>=13.7",
     "faker>=25",               # synthetic data generator
     "connectorx>=0.3",         # JDBC-like reads from a DB (session 02)
-    "pyyaml>=6",               # YAML data contracts (session 08)
+    "pyyaml>=6",               # source catalogue (session 02), data contracts (session 08)
     "diskcache>=5.6",          # local key-value store (session 12, Redis/Valkey stand-in)
     "marimo>=0.9",             # reactive Python/SQL notebooks (session 01 SQL intro, later demos)
 ]
